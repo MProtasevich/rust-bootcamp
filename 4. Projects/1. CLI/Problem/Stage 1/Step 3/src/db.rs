@@ -10,35 +10,82 @@ pub struct JiraDatabase {
 
 impl JiraDatabase {
     pub fn new(file_path: String) -> Self {
-        todo!()
+        let database = Box::new(JSONFileDatabase {
+            file_path,
+        });
+        JiraDatabase {
+            database
+        }
     }
 
     pub fn read_db(&self) -> Result<DBState> {
-        todo!()
+        self.database.read_db()
     }
     
     pub fn create_epic(&self, epic: Epic) -> Result<u32> {
-        todo!()
+        self.update_db(|db_state| {
+            db_state.last_item_id += 1;
+            db_state.epics.insert(db_state.last_item_id, epic);
+            Ok(db_state.last_item_id)
+        })
     }
-    
+
     pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
-        todo!()
+        self.update_db(|db_state| {
+            db_state.last_item_id += 1;
+            db_state.epics.get_mut(&epic_id).map(|epic| epic.stories.push(db_state.last_item_id))
+                .ok_or_else(|| anyhow::Error::msg("No such epic with id: {epic_id}"))?;
+
+            db_state.stories.insert(db_state.last_item_id, story);
+            Ok(db_state.last_item_id)
+        })
     }
     
     pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
-        todo!()
+        self.update_db(|db_state| {
+            db_state.epics.remove(&epic_id)
+                .map(|epic| db_state.stories.retain(|story_id, _| !epic.stories.contains(story_id)))
+                .ok_or_else(|| anyhow::Error::msg("No such epic with id: {epic_id}"))
+        })
     }
     
-    pub fn delete_story(&self,epic_id: u32, story_id: u32) -> Result<()> {
-        todo!()
+    pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> {
+        self.update_db(|db_state| {
+            if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+                epic.stories.retain(|&story| story != story_id)
+            } else {
+                return Err(anyhow::Error::msg("No such epic with id: {epic_id}"));
+            }
+            db_state.stories
+                .remove(&story_id)
+                .map(|_| ())
+                .ok_or_else(|| anyhow::Error::msg("No such epic with id: {epic_id}"))
+        })
     }
     
     pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
-        todo!()
+        self.update_db(|db_state| {
+            db_state.epics
+                .get_mut(&epic_id)
+                .map(|epic| epic.status = status)
+                .ok_or_else(|| anyhow::Error::msg("No such epic with id: {epic_id}"))
+        })
     }
     
     pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
-        todo!()
+        self.update_db(|db_state| {
+            db_state.stories
+                .get_mut(&story_id)
+                .map(|story| story.status = status)
+                .ok_or_else(|| anyhow::Error::msg("No such story with id: {story_id}"))
+        })
+    }
+
+    fn update_db<T>(&self, mut op: impl FnOnce(&mut DBState) -> Result<T>) -> Result<T> {
+        let mut state = self.database.read_db()?;
+        let result = op(&mut state);
+        self.database.write_db(&state)?;
+        result
     }
 }
 
@@ -81,14 +128,12 @@ pub mod test_utils {
 
     impl Database for MockDB {
         fn read_db(&self) -> Result<DBState> {
-            // TODO: fix this error by deriving the appropriate traits for Story
             let state = self.last_written_state.borrow().clone();
             Ok(state)
         }
 
         fn write_db(&self, db_state: &DBState) -> Result<()> {
             let latest_state = &self.last_written_state;
-            // TODO: fix this error by deriving the appropriate traits for DBState
             *latest_state.borrow_mut() = db_state.clone();
             Ok(())
         }
@@ -105,7 +150,6 @@ mod tests {
         let db = JiraDatabase { database: Box::new(MockDB::new()) };
         let epic = Epic::new("".to_owned(), "".to_owned());
 
-        // TODO: fix this error by deriving the appropriate traits for Epic
         let result = db.create_epic(epic.clone());
         
         assert_eq!(result.is_ok(), true);
@@ -142,7 +186,6 @@ mod tests {
 
         let epic_id = result.unwrap();
 
-        // TODO: fix this error by deriving the appropriate traits for Story
         let result = db.create_story(story.clone(), epic_id);
         assert_eq!(result.is_ok(), true);
 
