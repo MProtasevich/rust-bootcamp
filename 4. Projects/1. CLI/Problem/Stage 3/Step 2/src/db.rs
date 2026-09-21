@@ -20,75 +20,69 @@ impl JiraDatabase {
     }
     
     pub fn create_epic(&self, epic: Epic) -> Result<u32> {
-        let mut parsed = self.database.read_db()?;
-    
-        let last_id = parsed.last_item_id;
-        let new_id = last_id + 1;
-        
-        parsed.last_item_id = new_id;
-        parsed.epics.insert(new_id, epic);
-    
-        self.database.write_db(&parsed)?;
-        Ok(new_id)
+        self.update_db(|db_state| {
+            db_state.last_item_id += 1;
+            db_state.epics.insert(db_state.last_item_id, epic);
+            Ok(db_state.last_item_id)
+        })
     }
-    
+
     pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
-        let mut parsed = self.database.read_db()?;
-    
-        let last_id = parsed.last_item_id;
-        let new_id = last_id + 1;
-        
-        parsed.last_item_id = new_id;
-        parsed.stories.insert(new_id, story);
-        parsed.epics.get_mut(&epic_id).ok_or_else(|| anyhow!("could not find epic in database!"))?.stories.push(new_id);
-    
-        self.database.write_db(&parsed)?;
-        Ok(new_id)
+        self.update_db(|db_state| {
+            db_state.last_item_id += 1;
+            db_state.epics.get_mut(&epic_id).map(|epic| epic.stories.push(db_state.last_item_id))
+                .ok_or_else(|| anyhow!("No such epic with id: {epic_id}"))?;
+
+            db_state.stories.insert(db_state.last_item_id, story);
+            Ok(db_state.last_item_id)
+        })
     }
     
     pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
-        let mut parsed = self.database.read_db()?;
-    
-        for story_id in &parsed.epics.get(&epic_id).ok_or_else(|| anyhow!("could not find epic in database!"))?.stories {
-            parsed.stories.remove(story_id);
-        }
-        
-        parsed.epics.remove(&epic_id);
-    
-        self.database.write_db(&parsed)?;
-        Ok(())
+        self.update_db(|db_state| {
+            db_state.epics.remove(&epic_id)
+                .map(|epic| db_state.stories.retain(|story_id, _| !epic.stories.contains(story_id)))
+                .ok_or_else(|| anyhow!("No such epic with id: {epic_id}"))
+        })
     }
     
-    pub fn delete_story(&self,epic_id: u32, story_id: u32) -> Result<()> {
-        let mut parsed = self.database.read_db()?;
-    
-        let epic = parsed.epics.get_mut(&epic_id).ok_or_else(|| anyhow!("could not find epic in database!"))?;
-    
-        let story_index = epic.stories.iter().position(|id| id == &story_id).ok_or_else(|| anyhow!("story id not found in epic stories vector"))?;
-        epic.stories.remove(story_index);
-    
-        parsed.stories.remove(&story_id);
-    
-        self.database.write_db(&parsed)?;
-        Ok(())
+    pub fn delete_story(&self, epic_id: u32, story_id: u32) -> Result<()> {
+        self.update_db(|db_state| {
+            if let Some(epic) = db_state.epics.get_mut(&epic_id) {
+                epic.stories.retain(|&story| story != story_id)
+            } else {
+                return Err(anyhow!("No such epic with id: {epic_id}"));
+            }
+            db_state.stories
+                .remove(&story_id)
+                .map(|_| ())
+                .ok_or_else(|| anyhow!("No such epic with id: {epic_id}"))
+        })
     }
     
     pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
-        let mut parsed = self.database.read_db()?;
-    
-        parsed.epics.get_mut(&epic_id).ok_or_else(|| anyhow!("could not find epic in database!"))?.status = status;
-    
-        self.database.write_db(&parsed)?;
-        Ok(())
+        self.update_db(|db_state| {
+            db_state.epics
+                .get_mut(&epic_id)
+                .map(|epic| epic.status = status)
+                .ok_or_else(|| anyhow!("No such epic with id: {epic_id}"))
+        })
     }
     
     pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
-        let mut parsed = self.database.read_db()?;
-    
-        parsed.stories.get_mut(&story_id).ok_or_else(|| anyhow!("could not find story in database!"))?.status = status;
-    
-        self.database.write_db(&parsed)?;
-        Ok(())
+        self.update_db(|db_state| {
+            db_state.stories
+                .get_mut(&story_id)
+                .map(|story| story.status = status)
+                .ok_or_else(|| anyhow!("No such story with id: {story_id}"))
+        })
+    }
+
+    fn update_db<T>(&self, op: impl FnOnce(&mut DBState) -> Result<T>) -> Result<T> {
+        let mut state = self.database.read_db()?;
+        let result = op(&mut state);
+        self.database.write_db(&state)?;
+        result
     }
 }
 
