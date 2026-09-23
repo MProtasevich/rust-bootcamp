@@ -1,18 +1,29 @@
 use crate::models::*;
 use axum::{response::IntoResponse, Json};
-
+use chrono::Utc;
+use uuid::Uuid;
 // ---- CRUD for Questions ----
 
 pub async fn create_question(Json(question): Json<Question>) -> impl IntoResponse {
-    todo!()
+    Json(QuestionDetail {
+        question_uuid: Uuid::new_v4().to_string(),
+        title: question.title,
+        description: question.description,
+        created_at: Utc::now().to_rfc3339(),
+    })
 }
 
 pub async fn read_questions() -> impl IntoResponse {
-    todo!()
+    Json(vec![QuestionDetail {
+        question_uuid: "question_uuid".to_owned(),
+        title: "title".to_owned(),
+        description: "description".to_owned(),
+        created_at: "created_at".to_owned(),
+    }])
 }
 
 pub async fn delete_question(Json(question_uuid): Json<QuestionId>) {
-    todo!()
+    // ...
 }
 
 // ---- CRUD for Answers ----
