@@ -1,7 +1,16 @@
 use ellipse::Ellipse;
 
+const PLACEHOLDER_LENGTH: usize = 3;
+const PLACEHOLDER: &str = ".";
+
 pub fn get_column_string(text: &str, width: usize) -> String {
-    todo!() // use the truncate_ellipse function from the ellipse crate
+    if text.len() <= width {
+        format!("{text:width$}")
+    } else if width <= PLACEHOLDER_LENGTH {
+        PLACEHOLDER.repeat(width)
+    } else {
+        text.truncate_ellipse(width - PLACEHOLDER_LENGTH).to_string()
+    }
 }
 
 #[cfg(test)]

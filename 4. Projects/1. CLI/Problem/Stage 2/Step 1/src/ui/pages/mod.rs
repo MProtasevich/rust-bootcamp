@@ -23,7 +23,16 @@ impl Page for HomePage {
         println!("----------------------------- EPICS -----------------------------");
         println!("     id     |               name               |      status      ");
 
-        // TODO: print out epics using get_column_string(). also make sure the epics are sorted by id
+        let epics = self.db.read_db()?.epics.iter()
+            .sorted_by_key(|&(key, _)| key)
+            .fold(String::new(), |mut acc, (epic_id, epic)| {
+                let id = get_column_string(epic_id.to_string().as_str(), constants::view::main::ID_LEN);
+                let name = get_column_string(epic.name.as_str(), constants::view::main::NAME_LEN);
+                let status = get_column_string(epic.status.to_string().as_str(), constants::view::main::STATUS_LEN);
+                acc.push_str(format!("{id}|{name}|{status}\n").as_str());
+                acc
+            });
+        println!("{epics}");
 
         println!();
         println!();
@@ -34,7 +43,14 @@ impl Page for HomePage {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        let action = match input {
+            "q" => Some(Action::Exit),
+            "c" => Some(Action::CreateEpic),
+            id_string if let Ok(epic_id) = id_string.parse::<u32>()
+                && self.db.read_db()?.epics.contains_key(&epic_id) => Some(Action::NavigateToEpicDetail { epic_id }),
+            _ => None,
+        };
+        Ok(action)
     }
 }
 
@@ -51,16 +67,28 @@ impl Page for EpicDetail {
         println!("------------------------------ EPIC ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
 
-        // TODO: print out epic details using get_column_string()
-  
+        let id = get_column_string(self.epic_id.to_string().as_str(), constants::view::details::ID_LEN);
+        let name = get_column_string(epic.name.as_str(), constants::view::details::NAME_LEN);
+        let description = get_column_string(epic.description.as_str(), constants::view::details::DESCRIPTION_LEN);
+        let status = get_column_string(epic.status.to_string().as_str(), constants::view::details::STATUS_LEN);
+        println!("{id}|{name}|{description}|{status}");
+
         println!();
 
         println!("---------------------------- STORIES ----------------------------");
         println!("     id     |               name               |      status      ");
 
-        let stories = &db_state.stories;
-
-        // TODO: print out stories using get_column_string(). also make sure the stories are sorted by id
+        let stories = db_state.stories.iter()
+            .filter(|&(story_id, _)| epic.stories.contains(story_id))
+            .sorted_by_key(|(&key, _)| key)
+            .fold(String::new(), |mut acc, (story_id, story)| {
+                let id = get_column_string(story_id.to_string().as_str(), constants::view::main::ID_LEN);
+                let name = get_column_string(story.name.as_str(), constants::view::main::NAME_LEN);
+                let status = get_column_string(story.status.to_string().as_str(), constants::view::main::STATUS_LEN);
+                acc.push_str(format!("{id}|{name}|{status}\n").as_str());
+                acc
+            });
+        println!("{stories}");
 
         println!();
         println!();
@@ -71,7 +99,18 @@ impl Page for EpicDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        let db = self.db.read_db()?;
+        let epic = db.epics.get(&self.epic_id);
+        let action = match (input, epic) {
+            ("p", _) => Some(Action::NavigateToPreviousPage),
+            ("u", Some(_)) => Some(Action::UpdateEpicStatus { epic_id: self.epic_id }),
+            ("d", Some(_)) => Some(Action::DeleteEpic { epic_id: self.epic_id }),
+            ("c", Some(_)) => Some(Action::CreateStory { epic_id: self.epic_id }),
+            (id_string, _) if let Ok(story_id) = id_string.parse::<u32>() && db.stories.contains_key(&story_id) =>
+                Some(Action::NavigateToStoryDetail { epic_id: self.epic_id, story_id }),
+            _ => None,
+        };
+        Ok(action)
     }
 }
 
@@ -88,9 +127,13 @@ impl Page for StoryDetail {
 
         println!("------------------------------ STORY ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
-        
-        // TODO: print out story details using get_column_string()
-        
+
+        let id = get_column_string(self.story_id.to_string().as_str(), constants::view::details::ID_LEN);
+        let name = get_column_string(story.name.as_str(), constants::view::details::NAME_LEN);
+        let description = get_column_string(story.description.as_str(), constants::view::details::DESCRIPTION_LEN);
+        let status = get_column_string(story.status.to_string().as_str(), constants::view::details::STATUS_LEN);
+        println!("{id}|{name}|{description}|{status}");
+
         println!();
         println!();
 
@@ -100,8 +143,32 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        let action = match input {
+            "p" => Some(Action::NavigateToPreviousPage),
+            "u" => Some(Action::UpdateStoryStatus { story_id: self.story_id }),
+            "d" => Some(Action::DeleteStory { epic_id: self.epic_id, story_id: self.story_id }),
+            _ => None,
+        };
+        Ok(action)
     }
+}
+
+mod constants {
+
+    pub mod view {
+        pub mod main {
+            pub const ID_LEN: usize = 12;
+            pub const NAME_LEN: usize = 34;
+            pub const STATUS_LEN: usize = 18;
+        }
+        pub mod details {
+            pub const ID_LEN: usize = 6;
+            pub const NAME_LEN: usize = 14;
+            pub const DESCRIPTION_LEN: usize = 29;
+            pub const STATUS_LEN: usize = 14;
+        }
+    }
+
 }
 
 #[cfg(test)]
@@ -120,7 +187,7 @@ mod tests {
             let page = HomePage { db };
             assert_eq!(page.draw_page().is_ok(), true);
         }
-        
+
         #[test]
         fn handle_input_should_not_throw_error() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
@@ -213,7 +280,7 @@ mod tests {
             assert_eq!(page.handle_input(junk_input).unwrap(), None);
             assert_eq!(page.handle_input(junk_input_with_valid_prefix).unwrap(), None);
             assert_eq!(page.handle_input(input_with_trailing_white_spaces).unwrap(), None);
-        } 
+        }
     }
 
     mod story_detail_page {
@@ -276,6 +343,6 @@ mod tests {
             assert_eq!(page.handle_input(junk_input).unwrap(), None);
             assert_eq!(page.handle_input(junk_input_with_valid_prefix).unwrap(), None);
             assert_eq!(page.handle_input(input_with_trailing_white_spaces).unwrap(), None);
-        } 
+        }
     }
 }
