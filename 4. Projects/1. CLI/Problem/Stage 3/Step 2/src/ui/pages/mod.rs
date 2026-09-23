@@ -31,7 +31,7 @@ impl Page for HomePage {
                 let id = get_column_string(epic_id.to_string().as_str(), constants::view::main::ID_LEN);
                 let name = get_column_string(epic.name.as_str(), constants::view::main::NAME_LEN);
                 let status = get_column_string(epic.status.to_string().as_str(), constants::view::main::STATUS_LEN);
-                acc.push_str(format!("{id}|{name}|{status}\n").as_str());
+                acc.push_str(format!("{id} | {name} | {status}\n").as_str());
                 acc
             });
         println!("{epics}");
@@ -77,7 +77,7 @@ impl Page for EpicDetail {
         let name = get_column_string(epic.name.as_str(), constants::view::details::NAME_LEN);
         let description = get_column_string(epic.description.as_str(), constants::view::details::DESCRIPTION_LEN);
         let status = get_column_string(epic.status.to_string().as_str(), constants::view::details::STATUS_LEN);
-        println!("{id}|{name}|{description}|{status}");
+        println!("{id} | {name} | {description} | {status}");
 
         println!();
 
@@ -91,7 +91,7 @@ impl Page for EpicDetail {
                 let id = get_column_string(story_id.to_string().as_str(), constants::view::main::ID_LEN);
                 let name = get_column_string(story.name.as_str(), constants::view::main::NAME_LEN);
                 let status = get_column_string(story.status.to_string().as_str(), constants::view::main::STATUS_LEN);
-                acc.push_str(format!("{id}|{name}|{status}\n").as_str());
+                acc.push_str(format!("{id} | {name} | {status}\n").as_str());
                 acc
             });
         println!("{stories}");
@@ -142,7 +142,7 @@ impl Page for StoryDetail {
         let name = get_column_string(story.name.as_str(), constants::view::details::NAME_LEN);
         let description = get_column_string(story.description.as_str(), constants::view::details::DESCRIPTION_LEN);
         let status = get_column_string(story.status.to_string().as_str(), constants::view::details::STATUS_LEN);
-        println!("{id}|{name}|{description}|{status}");
+        println!("{id} | {name} | {description} | {status}");
 
         println!();
         println!();
@@ -171,15 +171,15 @@ mod constants {
 
     pub mod view {
         pub mod main {
-            pub const ID_LEN: usize = 12;
-            pub const NAME_LEN: usize = 34;
-            pub const STATUS_LEN: usize = 18;
+            pub const ID_LEN: usize = 11;
+            pub const NAME_LEN: usize = 32;
+            pub const STATUS_LEN: usize = 16;
         }
         pub mod details {
-            pub const ID_LEN: usize = 6;
-            pub const NAME_LEN: usize = 14;
-            pub const DESCRIPTION_LEN: usize = 29;
-            pub const STATUS_LEN: usize = 14;
+            pub const ID_LEN: usize = 5;
+            pub const NAME_LEN: usize = 12;
+            pub const DESCRIPTION_LEN: usize = 27;
+            pub const STATUS_LEN: usize = 12;
         }
     }
 
