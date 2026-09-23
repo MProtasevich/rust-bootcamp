@@ -11,29 +11,20 @@ pub async fn create_question(
     State(AppState { questions_dao, .. }): State<AppState>,
     Json(question): Json<Question>,
 ) -> impl IntoResponse {
-    Json(QuestionDetail {
-        question_uuid: "question_uuid".to_owned(),
-        title: "title".to_owned(),
-        description: "description".to_owned(),
-        created_at: "created_at".to_owned(),
-    })
+    Json(handlers_inner::create_question(question, &questions_dao).await)
 }
 
-pub async fn read_questions(// TODO: add questions_dao from app state as an argument
+pub async fn read_questions(
+    State(AppState { questions_dao, .. }): State<AppState>,
 ) -> impl IntoResponse {
-    Json(vec![QuestionDetail {
-        question_uuid: "question_uuid".to_owned(),
-        title: "title".to_owned(),
-        description: "description".to_owned(),
-        created_at: "created_at".to_owned(),
-    }])
+    Json(handlers_inner::read_questions(&questions_dao).await)
 }
 
 pub async fn delete_question(
-    // TODO: add questions_dao from app state as an argument
+    State(AppState { questions_dao, .. }): State<AppState>,
     Json(question_uuid): Json<QuestionId>,
-) {
-    // ...
+) -> impl IntoResponse {
+    Json(handlers_inner::delete_question(question_uuid, &questions_dao).await)
 }
 
 // ---- CRUD for Answers ----
@@ -43,29 +34,21 @@ pub async fn create_answer(
     State(AppState { answers_dao, .. }): State<AppState>,
     Json(answer): Json<Answer>,
 ) -> impl IntoResponse {
-    Json(AnswerDetail {
-        answer_uuid: "answer_uuid".to_owned(),
-        question_uuid: "question_uuid".to_owned(),
-        content: "content".to_owned(),
-        created_at: "created_at".to_owned(),
-    })
+    Json(handlers_inner::create_answer(answer, &answers_dao).await)
 }
 
 pub async fn read_answers(
     // TODO: add answers_dao from app state as an argument
+    State(AppState { answers_dao, .. }): State<AppState>,
     Json(question_uuid): Json<QuestionId>,
 ) -> impl IntoResponse {
-    Json(vec![AnswerDetail {
-        answer_uuid: "answer_uuid".to_owned(),
-        question_uuid: "question_uuid".to_owned(),
-        content: "content".to_owned(),
-        created_at: "created_at".to_owned(),
-    }])
+    Json(handlers_inner::read_answers(question_uuid, &answers_dao).await)
 }
 
 pub async fn delete_answer(
     // TODO: add answers_dao from app state as an argument
+    State(AppState { answers_dao, .. }): State<AppState>,
     Json(answer_uuid): Json<AnswerId>,
-) {
-    // ...
+) -> impl IntoResponse {
+    Json(handlers_inner::delete_answer(answer_uuid, &answers_dao).await)
 }
