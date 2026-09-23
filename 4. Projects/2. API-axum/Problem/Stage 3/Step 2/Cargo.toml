@@ -8,10 +8,12 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-axum = "0.7.4"
+axum = "0.8"
 sqlx = { version = "0.7.2", features = ["runtime-tokio-rustls" , "postgres", "time", "uuid"] }
 dotenvy = "0.15"
 log = "0.4"
 pretty_env_logger = "0.5"
 async-trait = "0.1"
 thiserror = "1.0"
+more-di = { version = "3.2", features = ["async"] }
+more-di-axum = "0.3"

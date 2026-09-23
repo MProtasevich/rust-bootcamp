@@ -1,21 +1,24 @@
+use std::sync::Arc;
 use async_trait::async_trait;
+use di::injectable;
 use sqlx::PgPool;
 
 use crate::models::{DBError, Question, QuestionDetail};
 
 #[async_trait]
-pub trait QuestionsDao {
+pub trait QuestionsDao: Send + Sync {
     async fn create_question(&self, question: Question) -> Result<QuestionDetail, DBError>;
     async fn delete_question(&self, question_uuid: String) -> Result<(), DBError>;
     async fn get_questions(&self) -> Result<Vec<QuestionDetail>, DBError>;
 }
 
+#[injectable(QuestionsDao)]
 pub struct QuestionsDaoImpl {
-    db: PgPool,
+    db: Arc<PgPool>,
 }
 
 impl QuestionsDaoImpl {
-    pub fn new(db: PgPool) -> Self {
+    pub fn new(db: Arc<PgPool>) -> Self {
         QuestionsDaoImpl { db }
     }
 }
@@ -32,7 +35,7 @@ impl QuestionsDao for QuestionsDaoImpl {
             question.title,
             question.description
         )
-        .fetch_one(&self.db)
+        .fetch_one(self.db.as_ref())
         .await
         .map_err(|e| DBError::Other(Box::new(e)))?;
 
@@ -50,7 +53,7 @@ impl QuestionsDao for QuestionsDaoImpl {
         })?;
 
         sqlx::query!("DELETE FROM questions WHERE question_uuid = $1", uuid)
-            .execute(&self.db)
+            .execute(self.db.as_ref())
             .await
             .map_err(|e| DBError::Other(Box::new(e)))?;
 
@@ -59,7 +62,7 @@ impl QuestionsDao for QuestionsDaoImpl {
 
     async fn get_questions(&self) -> Result<Vec<QuestionDetail>, DBError> {
         let records = sqlx::query!("SELECT * FROM questions")
-            .fetch_all(&self.db)
+            .fetch_all(self.db.as_ref())
             .await
             .map_err(|e| DBError::Other(Box::new(e)))?;
 

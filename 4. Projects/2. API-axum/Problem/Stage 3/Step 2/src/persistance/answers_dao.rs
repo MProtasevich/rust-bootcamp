@@ -1,21 +1,24 @@
+use std::sync::Arc;
 use async_trait::async_trait;
+use di::injectable;
 use sqlx::PgPool;
 
 use crate::models::{postgres_error_codes, Answer, AnswerDetail, DBError};
 
 #[async_trait]
-pub trait AnswersDao {
+pub trait AnswersDao: Send + Sync {
     async fn create_answer(&self, answer: Answer) -> Result<AnswerDetail, DBError>;
     async fn delete_answer(&self, answer_uuid: String) -> Result<(), DBError>;
     async fn get_answers(&self, question_uuid: String) -> Result<Vec<AnswerDetail>, DBError>;
 }
 
+#[injectable(AnswersDao)]
 pub struct AnswersDaoImpl {
-    db: PgPool,
+    db: Arc<PgPool>,
 }
 
 impl AnswersDaoImpl {
-    pub fn new(db: PgPool) -> Self {
+    pub fn new(db: Arc<PgPool>) -> Self {
         AnswersDaoImpl { db }
     }
 }
@@ -39,7 +42,7 @@ impl AnswersDao for AnswersDaoImpl {
             uuid,
             answer.content
         )
-        .fetch_one(&self.db)
+        .fetch_one(self.db.as_ref())
         .await
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) => {
@@ -70,7 +73,7 @@ impl AnswersDao for AnswersDaoImpl {
         })?;
 
         sqlx::query!("DELETE FROM answers WHERE answer_uuid = $1", uuid)
-            .execute(&self.db)
+            .execute(self.db.as_ref())
             .await
             .map_err(|e| DBError::Other(Box::new(e)))?;
 
@@ -83,7 +86,7 @@ impl AnswersDao for AnswersDaoImpl {
         })?;
 
         let records = sqlx::query!("SELECT * FROM answers WHERE question_uuid = $1", uuid)
-            .fetch_all(&self.db)
+            .fetch_all(self.db.as_ref())
             .await
             .map_err(|e| DBError::Other(Box::new(e)))?;
 
