@@ -7,7 +7,7 @@ pub fn get_user_input() -> String {
         .read_line(&mut user_input)
         .unwrap();
 
-    user_input
+    user_input.trim().to_string()
 }
 
 pub fn wait_for_key_press() {
