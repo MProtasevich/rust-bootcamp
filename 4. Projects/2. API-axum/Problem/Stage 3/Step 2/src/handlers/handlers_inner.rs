@@ -1,9 +1,11 @@
+use std::sync::Arc;
+use serde::Serialize;
 use crate::{
     models::{Answer, AnswerDetail, AnswerId, DBError, Question, QuestionDetail, QuestionId},
     persistance::{answers_dao::AnswersDao, questions_dao::QuestionsDao},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize)]
 pub enum HandlerError {
     BadRequest(String),
     InternalError(String),
@@ -17,27 +19,27 @@ impl HandlerError {
 
 pub async fn create_question(
     question: Question,
-    questions_dao: &(dyn QuestionsDao + Sync + Send),
+    questions_dao: &dyn QuestionsDao,
 ) -> Result<QuestionDetail, HandlerError> {
     let question = questions_dao.create_question(question).await;
     match question {
         Ok(question) => Ok(question),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error creating question: {:?}", err);
             Err(HandlerError::default_internal_error())
         }
     }
 }
 
 pub async fn read_questions(
-    questions_dao: &(dyn QuestionsDao + Sync + Send),
+    questions_dao: &dyn QuestionsDao,
 ) -> Result<Vec<QuestionDetail>, HandlerError> {
     let questions = questions_dao.get_questions().await;
 
     match questions {
         Ok(questions) => Ok(questions),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error getting questions: {:?}", err);
             Err(HandlerError::default_internal_error())
         }
     }
@@ -45,17 +47,11 @@ pub async fn read_questions(
 
 pub async fn delete_question(
     question_uuid: QuestionId,
-    questions_dao: &(dyn QuestionsDao + Sync + Send),
+    questions_dao: &dyn QuestionsDao,
 ) -> Result<(), HandlerError> {
-    let result = questions_dao
-        .delete_question(question_uuid.question_uuid)
-        .await;
+    let result = questions_dao.delete_question(question_uuid.question_uuid).await;
 
-    if result.is_err() {
-        return Err(HandlerError::default_internal_error());
-    }
-
-    Ok(())
+    result.map_err(|_| HandlerError::default_internal_error())
 }
 
 pub async fn create_answer(
@@ -67,26 +63,27 @@ pub async fn create_answer(
     match answer {
         Ok(answer) => Ok(answer),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error creating answer: {:?}", err);
 
-            match err {
-                DBError::InvalidUUID(s) => Err(HandlerError::BadRequest(s)),
-                _ => Err(HandlerError::default_internal_error()),
-            }
+            let error = match err {
+                DBError::InvalidUUID(s) => HandlerError::BadRequest(s),
+                _ => HandlerError::default_internal_error(),
+            };
+            Err(error)
         }
     }
 }
 
 pub async fn read_answers(
     question_uuid: QuestionId,
-    answers_dao: &(dyn AnswersDao + Send + Sync),
+    answers_dao: &dyn AnswersDao,
 ) -> Result<Vec<AnswerDetail>, HandlerError> {
     let answers = answers_dao.get_answers(question_uuid.question_uuid).await;
 
     match answers {
         Ok(answers) => Ok(answers),
         Err(e) => {
-            error!("{:?}", e);
+            error!("Error getting answers: {:?}", e);
             Err(HandlerError::default_internal_error())
         }
     }
@@ -94,15 +91,11 @@ pub async fn read_answers(
 
 pub async fn delete_answer(
     answer_uuid: AnswerId,
-    answers_dao: &(dyn AnswersDao + Send + Sync),
+    answers_dao: &dyn AnswersDao,
 ) -> Result<(), HandlerError> {
     let result = answers_dao.delete_answer(answer_uuid.answer_uuid).await;
 
-    if result.is_err() {
-        return Err(HandlerError::default_internal_error());
-    }
-
-    Ok(())
+    result.map_err(|_| HandlerError::default_internal_error())
 }
 
 // ***********************************************************
@@ -114,6 +107,7 @@ mod tests {
     use super::*;
 
     use async_trait::async_trait;
+    use sqlx::types::time::PrimitiveDateTime;
     use tokio::sync::Mutex;
 
     struct QuestionsDaoMock {
@@ -227,14 +221,14 @@ mod tests {
             question_uuid: "123".to_owned(),
             title: question.title.clone(),
             description: question.description.clone(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
 
         questions_dao.mock_create_question(Ok(question_detail.clone()));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = create_question(question, questions_dao.as_ref()).await;
 
@@ -253,7 +247,7 @@ mod tests {
 
         questions_dao.mock_create_question(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = create_question(question, questions_dao.as_ref()).await;
 
@@ -270,14 +264,14 @@ mod tests {
             question_uuid: "123".to_owned(),
             title: "test title".to_owned(),
             description: "test description".to_owned(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
 
         questions_dao.mock_get_questions(Ok(vec![question_detail.clone()]));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = read_questions(questions_dao.as_ref()).await;
 
@@ -291,7 +285,7 @@ mod tests {
 
         questions_dao.mock_get_questions(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = read_questions(questions_dao.as_ref()).await;
 
@@ -312,7 +306,7 @@ mod tests {
 
         questions_dao.mock_delete_question(Ok(()));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = delete_question(question_id, questions_dao.as_ref()).await;
 
@@ -330,7 +324,7 @@ mod tests {
 
         questions_dao.mock_delete_question(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let questions_dao: Box<dyn QuestionsDao + Send + Sync> = Box::new(questions_dao);
+        let questions_dao = Arc::new(questions_dao);
 
         let result = delete_question(question_id, questions_dao.as_ref()).await;
 
@@ -352,14 +346,14 @@ mod tests {
             answer_uuid: "456".to_owned(),
             question_uuid: answer.question_uuid.clone(),
             content: answer.content.clone(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut answers_dao = AnswersDaoMock::new();
 
         answers_dao.mock_create_answer(Ok(answer_detail.clone()));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = create_answer(answer, answers_dao.as_ref()).await;
 
@@ -378,7 +372,7 @@ mod tests {
 
         answers_dao.mock_create_answer(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = create_answer(answer, answers_dao.as_ref()).await;
 
@@ -403,7 +397,7 @@ mod tests {
             "oh no!",
         )))));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = create_answer(answer, answers_dao.as_ref()).await;
 
@@ -420,7 +414,7 @@ mod tests {
             answer_uuid: "456".to_owned(),
             question_uuid: "123".to_owned(),
             content: "test content".to_owned(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let question_id = QuestionId {
@@ -431,7 +425,7 @@ mod tests {
 
         answers_dao.mock_get_answers(Ok(vec![answer_detail.clone()]));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = read_answers(question_id, answers_dao.as_ref()).await;
 
@@ -449,7 +443,7 @@ mod tests {
 
         answers_dao.mock_get_answers(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = read_answers(question_id, answers_dao.as_ref()).await;
 
@@ -470,7 +464,7 @@ mod tests {
 
         answers_dao.mock_delete_answer(Ok(()));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = delete_answer(answer_id, answers_dao.as_ref()).await;
 
@@ -488,7 +482,7 @@ mod tests {
 
         answers_dao.mock_delete_answer(Err(DBError::InvalidUUID("test".to_owned())));
 
-        let answers_dao: Box<dyn AnswersDao + Send + Sync> = Box::new(answers_dao);
+        let answers_dao = Arc::new(answers_dao);
 
         let result = delete_answer(answer_id, answers_dao.as_ref()).await;
 
