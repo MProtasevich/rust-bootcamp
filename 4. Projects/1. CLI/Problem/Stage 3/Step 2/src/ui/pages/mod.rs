@@ -52,7 +52,7 @@ impl Page for HomePage {
                 && self.db.read_db()?.epics.contains_key(&epic_id) => Some(Action::NavigateToEpicDetail { epic_id }),
             _ => None,
         };
-        Ok(action)
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -116,7 +116,7 @@ impl Page for EpicDetail {
                 Some(Action::NavigateToStoryDetail { epic_id: self.epic_id, story_id }),
             _ => None,
         };
-        Ok(action)
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -159,7 +159,7 @@ impl Page for StoryDetail {
             "d" => Some(Action::DeleteStory { epic_id: self.epic_id, story_id: self.story_id }),
             _ => None,
         };
-        Ok(action)
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -183,6 +183,13 @@ mod constants {
         }
     }
 
+}
+
+fn handle_action(input: &str, action: Option<Action>) -> Result<Option<Action>> {
+    match action {
+        Some(action) => Ok(Some(action)),
+        None => Err(anyhow!("Unknown action! Input: {input}")),
+    }
 }
 
 #[cfg(test)]

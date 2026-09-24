@@ -56,7 +56,7 @@ impl JiraDatabase {
             db_state.stories
                 .remove(&story_id)
                 .map(|_| ())
-                .ok_or_else(|| anyhow!("No such epic with id: {epic_id}"))
+                .ok_or_else(|| anyhow!("No such story with id: {story_id}"))
         })
     }
     
@@ -81,8 +81,13 @@ impl JiraDatabase {
     fn update_db<T>(&self, op: impl FnOnce(&mut DBState) -> Result<T>) -> Result<T> {
         let mut state = self.database.read_db()?;
         let result = op(&mut state);
-        self.database.write_db(&state)?;
-        result
+        match result {
+            Ok(_) => {
+                self.database.write_db(&state)?;
+                result
+            },
+            Err(e) => Err(anyhow!(e)),
+        }
     }
 }
 
