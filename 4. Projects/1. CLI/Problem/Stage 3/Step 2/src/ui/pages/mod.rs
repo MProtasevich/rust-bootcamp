@@ -25,15 +25,16 @@ impl Page for HomePage {
         println!("----------------------------- EPICS -----------------------------");
         println!("     id     |               name               |      status      ");
 
-        let epics = self.db.read_db()?.epics;
-
-        for id in epics.keys().sorted() {
-            let epic = &epics[id];
-            let id_col = get_column_string(&id.to_string(), 11);
-            let name_col = get_column_string(&epic.name, 32);
-            let status_col = get_column_string(&epic.status.to_string(), 17);
-            println!("{} | {} | {}", id_col, name_col, status_col);
-        }
+        let epics = self.db.read_db()?.epics.iter()
+            .sorted_by_key(|&(key, _)| key)
+            .fold(String::new(), |mut acc, (epic_id, epic)| {
+                let id = get_column_string(epic_id.to_string().as_str(), constants::view::main::ID_LEN);
+                let name = get_column_string(epic.name.as_str(), constants::view::main::NAME_LEN);
+                let status = get_column_string(epic.status.to_string().as_str(), constants::view::main::STATUS_LEN);
+                acc.push_str(format!("{id} | {name} | {status}\n").as_str());
+                acc
+            });
+        println!("{epics}");
 
         println!();
         println!();
@@ -44,20 +45,14 @@ impl Page for HomePage {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        let epics = self.db.read_db()?.epics;
-
-        match input {
-            "q" => Ok(Some(Action::Exit)),
-            "c" => Ok(Some(Action::CreateEpic)),
-            input => {
-                if let Ok(epic_id) = input.parse::<u32>() {
-                    if epics.contains_key(&epic_id) {
-                        return Ok(Some(Action::NavigateToEpicDetail { epic_id }));
-                    }
-                }
-                Ok(None)
-            }
-        }
+        let action = match input {
+            "q" => Some(Action::Exit),
+            "c" => Some(Action::CreateEpic),
+            id_string if let Ok(epic_id) = id_string.parse::<u32>()
+                && self.db.read_db()?.epics.contains_key(&epic_id) => Some(Action::NavigateToEpicDetail { epic_id }),
+            _ => None,
+        };
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -78,26 +73,28 @@ impl Page for EpicDetail {
         println!("------------------------------ EPIC ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
 
-        let id_col = get_column_string(&self.epic_id.to_string(), 5);
-        let name_col = get_column_string(&epic.name, 12);
-        let desc_col = get_column_string(&epic.description, 27);
-        let status_col = get_column_string(&epic.status.to_string(), 13);
-        println!("{} | {} | {} | {}", id_col, name_col, desc_col, status_col);
+        let id = get_column_string(self.epic_id.to_string().as_str(), constants::view::details::ID_LEN);
+        let name = get_column_string(epic.name.as_str(), constants::view::details::NAME_LEN);
+        let description = get_column_string(epic.description.as_str(), constants::view::details::DESCRIPTION_LEN);
+        let status = get_column_string(epic.status.to_string().as_str(), constants::view::details::STATUS_LEN);
+        println!("{id} | {name} | {description} | {status}");
 
         println!();
 
         println!("---------------------------- STORIES ----------------------------");
         println!("     id     |               name               |      status      ");
 
-        let stories = &db_state.stories;
-
-        for id in epic.stories.iter().sorted() {
-            let story = &stories[id];
-            let id_col = get_column_string(&id.to_string(), 11);
-            let name_col = get_column_string(&story.name, 32);
-            let status_col = get_column_string(&story.status.to_string(), 17);
-            println!("{} | {} | {}", id_col, name_col, status_col);
-        }
+        let stories = db_state.stories.iter()
+            .filter(|&(story_id, _)| epic.stories.contains(story_id))
+            .sorted_by_key(|(&key, _)| key)
+            .fold(String::new(), |mut acc, (story_id, story)| {
+                let id = get_column_string(story_id.to_string().as_str(), constants::view::main::ID_LEN);
+                let name = get_column_string(story.name.as_str(), constants::view::main::NAME_LEN);
+                let status = get_column_string(story.status.to_string().as_str(), constants::view::main::STATUS_LEN);
+                acc.push_str(format!("{id} | {name} | {status}\n").as_str());
+                acc
+            });
+        println!("{stories}");
 
         println!();
         println!();
@@ -108,23 +105,18 @@ impl Page for EpicDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        let db_state = self.db.read_db()?;
-        let stories = db_state.stories;
-
-        match input {
-            "p" => Ok(Some(Action::NavigateToPreviousPage)),
-            "u" => Ok(Some(Action::UpdateEpicStatus { epic_id: self.epic_id })),
-            "d" => Ok(Some(Action::DeleteEpic{ epic_id: self.epic_id })),
-            "c" => Ok(Some(Action::CreateStory { epic_id: self.epic_id })),
-            input => {
-                if let Ok(story_id) = input.parse::<u32>() {
-                    if stories.contains_key(&story_id) {
-                        return Ok(Some(Action::NavigateToStoryDetail { epic_id: self.epic_id, story_id }));
-                    }
-                }
-                Ok(None)
-            }
-        }
+        let db = self.db.read_db()?;
+        let epic = db.epics.get(&self.epic_id);
+        let action = match (input, epic) {
+            ("p", _) => Some(Action::NavigateToPreviousPage),
+            ("u", Some(_)) => Some(Action::UpdateEpicStatus { epic_id: self.epic_id }),
+            ("d", Some(_)) => Some(Action::DeleteEpic { epic_id: self.epic_id }),
+            ("c", Some(_)) => Some(Action::CreateStory { epic_id: self.epic_id }),
+            (id_string, _) if let Ok(story_id) = id_string.parse::<u32>() && db.stories.contains_key(&story_id) =>
+                Some(Action::NavigateToStoryDetail { epic_id: self.epic_id, story_id }),
+            _ => None,
+        };
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -145,12 +137,13 @@ impl Page for StoryDetail {
 
         println!("------------------------------ STORY ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
-        let id_col = get_column_string(&self.story_id.to_string(), 5);
-        let name_col = get_column_string(&story.name, 12);
-        let desc_col = get_column_string(&story.description, 27);
-        let status_col = get_column_string(&story.status.to_string(), 13);
-        println!("{} | {} | {} | {}", id_col, name_col, desc_col, status_col);
-        
+
+        let id = get_column_string(self.story_id.to_string().as_str(), constants::view::details::ID_LEN);
+        let name = get_column_string(story.name.as_str(), constants::view::details::NAME_LEN);
+        let description = get_column_string(story.description.as_str(), constants::view::details::DESCRIPTION_LEN);
+        let status = get_column_string(story.status.to_string().as_str(), constants::view::details::STATUS_LEN);
+        println!("{id} | {name} | {description} | {status}");
+
         println!();
         println!();
 
@@ -160,18 +153,42 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        match input {
-            "p" => Ok(Some(Action::NavigateToPreviousPage)),
-            "u" => Ok(Some(Action::UpdateStoryStatus { story_id: self.story_id })),
-            "d" => Ok(Some(Action::DeleteStory { epic_id: self.epic_id, story_id: self.story_id })),
-            _ => {
-                Ok(None)
-            }
-        }
+        let action = match input {
+            "p" => Some(Action::NavigateToPreviousPage),
+            "u" => Some(Action::UpdateStoryStatus { story_id: self.story_id }),
+            "d" => Some(Action::DeleteStory { epic_id: self.epic_id, story_id: self.story_id }),
+            _ => None,
+        };
+        handle_action(input, action)
     }
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+mod constants {
+
+    pub mod view {
+        pub mod main {
+            pub const ID_LEN: usize = 11;
+            pub const NAME_LEN: usize = 32;
+            pub const STATUS_LEN: usize = 16;
+        }
+        pub mod details {
+            pub const ID_LEN: usize = 5;
+            pub const NAME_LEN: usize = 12;
+            pub const DESCRIPTION_LEN: usize = 27;
+            pub const STATUS_LEN: usize = 12;
+        }
+    }
+
+}
+
+fn handle_action(input: &str, action: Option<Action>) -> Result<Option<Action>> {
+    match action {
+        Some(action) => Ok(Some(action)),
+        None => Err(anyhow!("Unknown action! Input: {input}")),
     }
 }
 
@@ -191,14 +208,14 @@ mod tests {
             let page = HomePage { db };
             assert_eq!(page.draw_page().is_ok(), true);
         }
-        
+
         #[test]
         fn handle_input_should_not_throw_error() {
             let db = Rc::new(JiraDatabase { database: Box::new(MockDB::new()) });
 
             let page = HomePage { db };
             assert_eq!(page.handle_input("").is_ok(), true);
-        } 
+        }
 
         #[test]
         fn handle_input_should_return_the_correct_actions() {
@@ -225,7 +242,7 @@ mod tests {
             assert_eq!(page.handle_input(junk_input).unwrap(), None);
             assert_eq!(page.handle_input(junk_input_with_valid_prefix).unwrap(), None);
             assert_eq!(page.handle_input(input_with_trailing_white_spaces).unwrap(), None);
-        } 
+        }
     }
 
     mod epic_detail_page {
@@ -284,7 +301,7 @@ mod tests {
             assert_eq!(page.handle_input(junk_input).unwrap(), None);
             assert_eq!(page.handle_input(junk_input_with_valid_prefix).unwrap(), None);
             assert_eq!(page.handle_input(input_with_trailing_white_spaces).unwrap(), None);
-        } 
+        }
     }
 
     mod story_detail_page {
@@ -347,6 +364,6 @@ mod tests {
             assert_eq!(page.handle_input(junk_input).unwrap(), None);
             assert_eq!(page.handle_input(junk_input_with_valid_prefix).unwrap(), None);
             assert_eq!(page.handle_input(input_with_trailing_white_spaces).unwrap(), None);
-        } 
+        }
     }
 }
