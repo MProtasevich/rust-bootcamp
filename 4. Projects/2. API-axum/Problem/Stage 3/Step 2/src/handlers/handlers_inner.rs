@@ -25,7 +25,7 @@ pub async fn create_question(
     match question {
         Ok(question) => Ok(question),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error creating question: {:?}", err);
             Err(HandlerError::default_internal_error())
         }
     }
@@ -39,7 +39,7 @@ pub async fn read_questions(
     match questions {
         Ok(questions) => Ok(questions),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error getting questions: {:?}", err);
             Err(HandlerError::default_internal_error())
         }
     }
@@ -49,32 +49,27 @@ pub async fn delete_question(
     question_uuid: QuestionId,
     questions_dao: &dyn QuestionsDao,
 ) -> Result<(), HandlerError> {
-    let result = questions_dao
-        .delete_question(question_uuid.question_uuid)
-        .await;
+    let result = questions_dao.delete_question(question_uuid.question_uuid).await;
 
-    if result.is_err() {
-        return Err(HandlerError::default_internal_error());
-    }
-
-    Ok(())
+    result.map_err(|_| HandlerError::default_internal_error())
 }
 
 pub async fn create_answer(
     answer: Answer,
-    answers_dao: &dyn AnswersDao,
+    answers_dao: &(dyn AnswersDao + Send + Sync),
 ) -> Result<AnswerDetail, HandlerError> {
     let answer = answers_dao.create_answer(answer).await;
 
     match answer {
         Ok(answer) => Ok(answer),
         Err(err) => {
-            error!("{:?}", err);
+            error!("Error creating answer: {:?}", err);
 
-            match err {
-                DBError::InvalidUUID(s) => Err(HandlerError::BadRequest(s)),
-                _ => Err(HandlerError::default_internal_error()),
-            }
+            let error = match err {
+                DBError::InvalidUUID(s) => HandlerError::BadRequest(s),
+                _ => HandlerError::default_internal_error(),
+            };
+            Err(error)
         }
     }
 }
@@ -88,7 +83,7 @@ pub async fn read_answers(
     match answers {
         Ok(answers) => Ok(answers),
         Err(e) => {
-            error!("{:?}", e);
+            error!("Error getting answers: {:?}", e);
             Err(HandlerError::default_internal_error())
         }
     }
@@ -100,11 +95,7 @@ pub async fn delete_answer(
 ) -> Result<(), HandlerError> {
     let result = answers_dao.delete_answer(answer_uuid.answer_uuid).await;
 
-    if result.is_err() {
-        return Err(HandlerError::default_internal_error());
-    }
-
-    Ok(())
+    result.map_err(|_| HandlerError::default_internal_error())
 }
 
 // ***********************************************************
@@ -116,6 +107,7 @@ mod tests {
     use super::*;
 
     use async_trait::async_trait;
+    use sqlx::types::time::PrimitiveDateTime;
     use tokio::sync::Mutex;
 
     struct QuestionsDaoMock {
@@ -229,7 +221,7 @@ mod tests {
             question_uuid: "123".to_owned(),
             title: question.title.clone(),
             description: question.description.clone(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -272,7 +264,7 @@ mod tests {
             question_uuid: "123".to_owned(),
             title: "test title".to_owned(),
             description: "test description".to_owned(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -354,7 +346,7 @@ mod tests {
             answer_uuid: "456".to_owned(),
             question_uuid: answer.question_uuid.clone(),
             content: answer.content.clone(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -422,7 +414,7 @@ mod tests {
             answer_uuid: "456".to_owned(),
             question_uuid: "123".to_owned(),
             content: "test content".to_owned(),
-            created_at: "now".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let question_id = QuestionId {
