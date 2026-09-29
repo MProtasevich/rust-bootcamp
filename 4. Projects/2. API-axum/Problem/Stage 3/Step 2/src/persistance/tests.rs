@@ -115,7 +115,7 @@ mod answers_tests {
 
         let result = answer_doa
             .create_answer(Answer {
-                question_uuid: result.question_uuid,
+                question_uuid: result.question_uuid.to_string(),
                 content: "test content".to_owned(),
             })
             .await
@@ -197,19 +197,19 @@ mod answers_tests {
 
         let result = answer_doa
             .create_answer(Answer {
-                question_uuid: question.question_uuid.clone(),
+                question_uuid: question.question_uuid.to_string(),
                 content: "test content".to_owned(),
             })
             .await
             .map_err(|e| format!("{:?}", e))?;
 
         answer_doa
-            .delete_answer(result.answer_uuid)
+            .delete_answer(result.answer_uuid.to_string())
             .await
             .map_err(|e| format!("{:?}", e))?;
 
         let results = answer_doa
-            .get_answers(question.question_uuid.clone())
+            .get_answers(question.question_uuid.to_string())
             .await
             .map_err(|e| format!("{:?}", e))?;
 
@@ -287,14 +287,14 @@ mod answers_tests {
 
         let result = answer_doa
             .create_answer(Answer {
-                question_uuid: question.question_uuid.clone(),
+                question_uuid: question.question_uuid.to_string(),
                 content: "test content".to_owned(),
             })
             .await
             .map_err(|e| format!("{:?}", e))?;
 
         let results = answer_doa
-            .get_answers(question.question_uuid.clone())
+            .get_answers(question.question_uuid.to_string())
             .await
             .map_err(|e| format!("{:?}", e))?;
 
@@ -438,7 +438,7 @@ mod questions_tests {
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        doa.delete_question(result.question_uuid)
+        doa.delete_question(result.question_uuid.to_string())
             .await
             .map_err(|e| format!("{:?}", e))?;
 

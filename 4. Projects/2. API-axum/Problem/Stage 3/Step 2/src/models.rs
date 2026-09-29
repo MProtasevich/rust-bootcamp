@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::types::time::PrimitiveDateTime;
 use sqlx::FromRow;
+use sqlx::types::Uuid;
 use thiserror::Error;
 
 #[derive(Serialize, Deserialize)]
@@ -11,8 +12,7 @@ pub struct Question {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, FromRow)]
 pub struct QuestionDetail {
-    #[sqlx(try_from = "sqlx::types::Uuid")]
-    pub question_uuid: String,
+    pub question_uuid: Uuid,
     pub title: String,
     pub description: String,
     pub created_at: PrimitiveDateTime,
@@ -33,10 +33,8 @@ pub struct Answer {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
 pub struct AnswerDetail {
-    #[sqlx(try_from = "sqlx::types::Uuid")]
-    pub answer_uuid: String,
-    #[sqlx(try_from = "sqlx::types::Uuid")]
-    pub question_uuid: String,
+    pub answer_uuid: Uuid,
+    pub question_uuid: Uuid,
     pub content: String,
     pub created_at: PrimitiveDateTime,
 }

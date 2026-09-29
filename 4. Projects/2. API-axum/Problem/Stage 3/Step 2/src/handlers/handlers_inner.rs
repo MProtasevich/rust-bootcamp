@@ -49,7 +49,7 @@ pub async fn delete_question(
     question_uuid: QuestionId,
     questions_dao: &dyn QuestionsDao,
 ) -> Result<(), HandlerError> {
-    let result = questions_dao.delete_question(question_uuid.question_uuid).await;
+    let result = questions_dao.delete_question(question_uuid.question_uuid.to_string()).await;
 
     result.map_err(|_| HandlerError::default_internal_error())
 }
@@ -78,7 +78,7 @@ pub async fn read_answers(
     question_uuid: QuestionId,
     answers_dao: &dyn AnswersDao,
 ) -> Result<Vec<AnswerDetail>, HandlerError> {
-    let answers = answers_dao.get_answers(question_uuid.question_uuid).await;
+    let answers = answers_dao.get_answers(question_uuid.question_uuid.to_string()).await;
 
     match answers {
         Ok(answers) => Ok(answers),
@@ -93,7 +93,7 @@ pub async fn delete_answer(
     answer_uuid: AnswerId,
     answers_dao: &dyn AnswersDao,
 ) -> Result<(), HandlerError> {
-    let result = answers_dao.delete_answer(answer_uuid.answer_uuid).await;
+    let result = answers_dao.delete_answer(answer_uuid.answer_uuid.to_string()).await;
 
     result.map_err(|_| HandlerError::default_internal_error())
 }
@@ -108,6 +108,7 @@ mod tests {
 
     use async_trait::async_trait;
     use sqlx::types::time::PrimitiveDateTime;
+    use sqlx::types::Uuid;
     use tokio::sync::Mutex;
 
     struct QuestionsDaoMock {
@@ -218,7 +219,7 @@ mod tests {
         };
 
         let question_detail = QuestionDetail {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4(),
             title: question.title.clone(),
             description: question.description.clone(),
             created_at: PrimitiveDateTime::MIN,
@@ -261,7 +262,7 @@ mod tests {
     #[tokio::test]
     async fn read_questions_should_return_questions() {
         let question_detail = QuestionDetail {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4(),
             title: "test title".to_owned(),
             description: "test description".to_owned(),
             created_at: PrimitiveDateTime::MIN,
@@ -299,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn delete_question_should_succeed() {
         let question_id = QuestionId {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4().to_string(),
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -317,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn delete_question_should_return_error() {
         let question_id = QuestionId {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4().to_string(),
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -337,14 +338,15 @@ mod tests {
 
     #[tokio::test]
     async fn create_answer_should_return_answer() {
+        let question_uuid = Uuid::new_v4();
         let answer = Answer {
-            question_uuid: "123".to_owned(),
+            question_uuid: question_uuid.to_string(),
             content: "test content".to_owned(),
         };
 
         let answer_detail = AnswerDetail {
-            answer_uuid: "456".to_owned(),
-            question_uuid: answer.question_uuid.clone(),
+            answer_uuid: Uuid::new_v4(),
+            question_uuid,
             content: answer.content.clone(),
             created_at: PrimitiveDateTime::MIN,
         };
@@ -364,7 +366,7 @@ mod tests {
     #[tokio::test]
     async fn create_answer_should_return_bad_request_error() {
         let answer = Answer {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4().to_string(),
             content: "test content".to_owned(),
         };
 
@@ -386,7 +388,7 @@ mod tests {
     #[tokio::test]
     async fn create_answer_should_return_internal_error() {
         let answer = Answer {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4().to_string(),
             content: "test content".to_owned(),
         };
 
@@ -410,15 +412,16 @@ mod tests {
 
     #[tokio::test]
     async fn read_answers_should_return_answers() {
-        let answer_detail = AnswerDetail {
-            answer_uuid: "456".to_owned(),
-            question_uuid: "123".to_owned(),
-            content: "test content".to_owned(),
-            created_at: PrimitiveDateTime::MIN,
+        let question_uuid = Uuid::new_v4();
+        let question_id = QuestionId {
+            question_uuid: question_uuid.to_string(),
         };
 
-        let question_id = QuestionId {
-            question_uuid: "123".to_owned(),
+        let answer_detail = AnswerDetail {
+            answer_uuid: Uuid::new_v4(),
+            question_uuid,
+            content: "test content".to_owned(),
+            created_at: PrimitiveDateTime::MIN,
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -436,7 +439,7 @@ mod tests {
     #[tokio::test]
     async fn read_answers_should_return_error() {
         let question_id = QuestionId {
-            question_uuid: "123".to_owned(),
+            question_uuid: Uuid::new_v4().to_string(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -457,7 +460,7 @@ mod tests {
     #[tokio::test]
     async fn delete_answer_should_succeed() {
         let answer_id = AnswerId {
-            answer_uuid: "123".to_owned(),
+            answer_uuid: Uuid::new_v4().to_string(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -475,7 +478,7 @@ mod tests {
     #[tokio::test]
     async fn delete_answer_should_return_error() {
         let answer_id = AnswerId {
-            answer_uuid: "123".to_owned(),
+            answer_uuid: Uuid::new_v4().to_string(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();

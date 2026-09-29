@@ -18,3 +18,4 @@ async-trait = "0.1"
 thiserror = "1.0"
 more-di = { version = "3.2", features = ["async"] }
 more-di-axum = "0.3"
+uuid = { version = "1.26.1", features = ["v4", "serde"] }
