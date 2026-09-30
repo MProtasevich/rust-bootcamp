@@ -10,7 +10,7 @@ use std::str::FromStr;
 #[async_trait]
 pub trait QuestionsDao: Send + Sync {
     async fn create_question(&self, question: Question) -> Result<QuestionDetail, DBError>;
-    async fn delete_question(&self, question_uuid: String) -> Result<(), DBError>;
+    async fn delete_question(&self, question_uuid: Uuid) -> Result<(), DBError>;
     async fn get_questions(&self) -> Result<Vec<QuestionDetail>, DBError>;
 }
 
@@ -36,11 +36,9 @@ impl QuestionsDao for QuestionsDaoImpl {
             .map_err(|e| DBError::Other(Box::new(e)))
     }
 
-    async fn delete_question(&self, question_uuid: String) -> Result<(), DBError> {
-        let uuid = Uuid::from_str(&question_uuid).map_err(|err| DBError::InvalidUUID(question_uuid))?;
-
+    async fn delete_question(&self, question_uuid: Uuid) -> Result<(), DBError> {
         sqlx::query("DELETE FROM questions WHERE question_uuid = $1")
-            .bind(uuid)
+            .bind(question_uuid)
             .execute(self.db.as_ref())
             .await
             .map(|_| ())

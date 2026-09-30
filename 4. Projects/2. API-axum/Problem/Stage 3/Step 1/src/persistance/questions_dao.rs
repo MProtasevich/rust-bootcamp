@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
-
+use sqlx::types::Uuid;
 use crate::models::{DBError, Question, QuestionDetail};
 
 #[async_trait]
 pub trait QuestionsDao {
     async fn create_question(&self, question: Question) -> Result<QuestionDetail, DBError>;
-    async fn delete_question(&self, question_uuid: String) -> Result<(), DBError>;
+    async fn delete_question(&self, question_uuid: Uuid) -> Result<(), DBError>;
     async fn get_questions(&self) -> Result<Vec<QuestionDetail>, DBError>;
 }
 
@@ -44,12 +44,8 @@ impl QuestionsDao for QuestionsDaoImpl {
         })
     }
 
-    async fn delete_question(&self, question_uuid: String) -> Result<(), DBError> {
-        let uuid = sqlx::types::Uuid::parse_str(&question_uuid).map_err(|_| {
-            DBError::InvalidUUID(format!("Could not parse question UUID: {}", question_uuid))
-        })?;
-
-        sqlx::query!("DELETE FROM questions WHERE question_uuid = $1", uuid)
+    async fn delete_question(&self, question_uuid: Uuid) -> Result<(), DBError> {
+        sqlx::query!("DELETE FROM questions WHERE question_uuid = $1", question_uuid)
             .execute(&self.db)
             .await
             .map_err(|e| DBError::Other(Box::new(e)))?;

@@ -11,40 +11,12 @@ mod answers_tests {
     };
 
     #[sqlx::test]
-    async fn create_answer_should_fail_with_malformed_uuid(pool: PgPool) -> Result<(), String> {
-        let answer_doa = AnswersDaoImpl::new(Arc::new(pool));
-
-        let result = answer_doa
-            .create_answer(Answer {
-                question_uuid: "malformed".to_owned(),
-                content: "test content".to_owned(),
-            })
-            .await;
-
-        if result.is_ok() {
-            return Err(format!(
-                "Expected an error but got the following result: {:?}",
-                result.unwrap()
-            ));
-        }
-
-        if let Err(DBError::InvalidUUID(_)) = result {
-            Ok(())
-        } else {
-            Err(format!(
-                "Expected an invalid UUID error but got the following error: {:?}",
-                result.err()
-            ))
-        }
-    }
-
-    #[sqlx::test]
     async fn create_answer_should_fail_with_non_existent_uuid(pool: PgPool) -> Result<(), String> {
-        let answer_doa = AnswersDaoImpl::new(Arc::new(pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::new(pool));
 
-        let result = answer_doa
+        let result = answer_dao
             .create_answer(Answer {
-                question_uuid: "a22abcd2-22ab-2222-a22b-2abc2a2b22cc".to_owned(),
+                question_uuid: "a22abcd2-22ab-2222-a22b-2abc2a2b22cc".parse().unwrap(),
                 content: "test content".to_owned(),
             })
             .await;
@@ -71,13 +43,13 @@ mod answers_tests {
         pool: PgPool,
     ) -> Result<(), String> {
         let pool = Arc::new(pool);
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         pool.close().await;
 
-        let result = answer_doa
+        let result = answer_dao
             .create_answer(Answer {
-                question_uuid: "a22abcd2-22ab-2222-a22b-2abc2a2b22cc".to_owned(),
+                question_uuid: "a22abcd2-22ab-2222-a22b-2abc2a2b22cc".parse().unwrap(),
                 content: "test content".to_owned(),
             })
             .await;
@@ -103,7 +75,7 @@ mod answers_tests {
     async fn create_answer_should_succeed(pool: PgPool) -> Result<(), String> {
         let pool = Arc::new(pool);
         let question_doa = QuestionsDaoImpl::new(Arc::clone(&pool));
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         let result = question_doa
             .create_question(Question {
@@ -113,9 +85,9 @@ mod answers_tests {
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        let result = answer_doa
+        let result = answer_dao
             .create_answer(Answer {
-                question_uuid: result.question_uuid.to_string(),
+                question_uuid: result.question_uuid,
                 content: "test content".to_owned(),
             })
             .await
@@ -129,39 +101,16 @@ mod answers_tests {
     }
 
     #[sqlx::test]
-    async fn delete_answer_should_fail_with_malformed_uuid(pool: PgPool) -> Result<(), String> {
-        let answer_doa = AnswersDaoImpl::new(Arc::new(pool));
-
-        let result = answer_doa.delete_answer("malformed".to_owned()).await;
-
-        if result.is_ok() {
-            return Err(format!(
-                "Expected an error but got the following result: {:?}",
-                result.unwrap()
-            ));
-        }
-
-        if let Err(DBError::InvalidUUID(_)) = result {
-            Ok(())
-        } else {
-            Err(format!(
-                "Expected an invalid UUID error but got the following error: {:?}",
-                result.err()
-            ))
-        }
-    }
-
-    #[sqlx::test]
     async fn delete_answer_should_fail_if_database_error_occurs(
         pool: PgPool,
     ) -> Result<(), String> {
         let pool = Arc::new(pool);
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         pool.close().await;
 
-        let result = answer_doa
-            .delete_answer("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".to_owned())
+        let result = answer_dao
+            .delete_answer("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".parse().unwrap())
             .await;
 
         if result.is_ok() {
@@ -185,7 +134,7 @@ mod answers_tests {
     async fn delete_answer_should_succeed(pool: PgPool) -> Result<(), String> {
         let pool = Arc::new(pool);
         let question_doa = QuestionsDaoImpl::new(Arc::clone(&pool));
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         let question = question_doa
             .create_question(Question {
@@ -195,21 +144,21 @@ mod answers_tests {
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        let result = answer_doa
+        let result = answer_dao
             .create_answer(Answer {
-                question_uuid: question.question_uuid.to_string(),
+                question_uuid: question.question_uuid,
                 content: "test content".to_owned(),
             })
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        answer_doa
-            .delete_answer(result.answer_uuid.to_string())
+        answer_dao
+            .delete_answer(result.answer_uuid)
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        let results = answer_doa
-            .get_answers(question.question_uuid.to_string())
+        let results = answer_dao
+            .get_answers(question.question_uuid)
             .await
             .map_err(|e| format!("{:?}", e))?;
 
@@ -221,37 +170,14 @@ mod answers_tests {
     }
 
     #[sqlx::test]
-    async fn get_answers_should_fail_with_malformed_uuid(pool: PgPool) -> Result<(), String> {
-        let answer_doa = AnswersDaoImpl::new(Arc::new(pool));
-
-        let result = answer_doa.get_answers("malformed".to_owned()).await;
-
-        if result.is_ok() {
-            return Err(format!(
-                "Expected an error but got the following result: {:?}",
-                result.unwrap()
-            ));
-        }
-
-        if let Err(DBError::InvalidUUID(_)) = result {
-            Ok(())
-        } else {
-            Err(format!(
-                "Expected an invalid UUID error but got the following error: {:?}",
-                result.err()
-            ))
-        }
-    }
-
-    #[sqlx::test]
     async fn get_answers_should_fail_if_database_error_occurs(pool: PgPool) -> Result<(), String> {
         let pool = Arc::new(pool);
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         pool.close().await;
 
-        let result = answer_doa
-            .get_answers("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".to_owned())
+        let result = answer_dao
+            .get_answers("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".parse().unwrap())
             .await;
 
         if result.is_ok() {
@@ -275,7 +201,7 @@ mod answers_tests {
     async fn get_answers_should_succeed(pool: PgPool) -> Result<(), String> {
         let pool = Arc::new(pool);
         let question_doa = QuestionsDaoImpl::new(Arc::clone(&pool));
-        let answer_doa = AnswersDaoImpl::new(Arc::clone(&pool));
+        let answer_dao = AnswersDaoImpl::new(Arc::clone(&pool));
 
         let question = question_doa
             .create_question(Question {
@@ -285,16 +211,16 @@ mod answers_tests {
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        let result = answer_doa
+        let result = answer_dao
             .create_answer(Answer {
-                question_uuid: question.question_uuid.to_string(),
+                question_uuid: question.question_uuid,
                 content: "test content".to_owned(),
             })
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        let results = answer_doa
-            .get_answers(question.question_uuid.to_string())
+        let results = answer_dao
+            .get_answers(question.question_uuid)
             .await
             .map_err(|e| format!("{:?}", e))?;
 
@@ -374,29 +300,6 @@ mod questions_tests {
     }
 
     #[sqlx::test]
-    async fn delete_question_should_fail_with_malformed_uuid(pool: PgPool) -> Result<(), String> {
-        let doa = QuestionsDaoImpl::new(Arc::new(pool));
-
-        let result = doa.delete_question("malformed".to_owned()).await;
-
-        if result.is_ok() {
-            return Err(format!(
-                "Expected an error but got the following result: {:?}",
-                result.unwrap()
-            ));
-        }
-
-        if let Err(DBError::InvalidUUID(_)) = result {
-            Ok(())
-        } else {
-            Err(format!(
-                "Expected an invalid UUID error but got the following error: {:?}",
-                result.err()
-            ))
-        }
-    }
-
-    #[sqlx::test]
     async fn delete_question_should_fail_if_database_error_occurs(
         pool: PgPool,
     ) -> Result<(), String> {
@@ -406,7 +309,7 @@ mod questions_tests {
         pool.close().await;
 
         let result = doa
-            .delete_question("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".to_owned())
+            .delete_question("a22abcd2-22ab-2222-a22b-2abc2a2b22cc".parse().unwrap())
             .await;
 
         if result.is_ok() {
@@ -438,7 +341,7 @@ mod questions_tests {
             .await
             .map_err(|e| format!("{:?}", e))?;
 
-        doa.delete_question(result.question_uuid.to_string())
+        doa.delete_question(result.question_uuid)
             .await
             .map_err(|e| format!("{:?}", e))?;
 

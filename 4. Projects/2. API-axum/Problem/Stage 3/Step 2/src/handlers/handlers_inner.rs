@@ -49,7 +49,7 @@ pub async fn delete_question(
     question_uuid: QuestionId,
     questions_dao: &dyn QuestionsDao,
 ) -> Result<(), HandlerError> {
-    let result = questions_dao.delete_question(question_uuid.question_uuid.to_string()).await;
+    let result = questions_dao.delete_question(question_uuid.question_uuid).await;
 
     result.map_err(|_| HandlerError::default_internal_error())
 }
@@ -78,7 +78,7 @@ pub async fn read_answers(
     question_uuid: QuestionId,
     answers_dao: &dyn AnswersDao,
 ) -> Result<Vec<AnswerDetail>, HandlerError> {
-    let answers = answers_dao.get_answers(question_uuid.question_uuid.to_string()).await;
+    let answers = answers_dao.get_answers(question_uuid.question_uuid).await;
 
     match answers {
         Ok(answers) => Ok(answers),
@@ -93,7 +93,7 @@ pub async fn delete_answer(
     answer_uuid: AnswerId,
     answers_dao: &dyn AnswersDao,
 ) -> Result<(), HandlerError> {
-    let result = answers_dao.delete_answer(answer_uuid.answer_uuid.to_string()).await;
+    let result = answers_dao.delete_answer(answer_uuid.answer_uuid).await;
 
     result.map_err(|_| HandlerError::default_internal_error())
 }
@@ -145,7 +145,7 @@ mod tests {
                 .take()
                 .expect("create_question_response should not be None.")
         }
-        async fn delete_question(&self, _: String) -> Result<(), DBError> {
+        async fn delete_question(&self, _: Uuid) -> Result<(), DBError> {
             self.delete_question_response
                 .lock()
                 .await
@@ -195,14 +195,14 @@ mod tests {
                 .take()
                 .expect("create_answer_response should not be None.")
         }
-        async fn delete_answer(&self, _: String) -> Result<(), DBError> {
+        async fn delete_answer(&self, _: Uuid) -> Result<(), DBError> {
             self.delete_answer_response
                 .lock()
                 .await
                 .take()
                 .expect("delete_answer_response should not be None.")
         }
-        async fn get_answers(&self, _: String) -> Result<Vec<AnswerDetail>, DBError> {
+        async fn get_answers(&self, _: Uuid) -> Result<Vec<AnswerDetail>, DBError> {
             self.get_answers_response
                 .lock()
                 .await
@@ -300,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn delete_question_should_succeed() {
         let question_id = QuestionId {
-            question_uuid: Uuid::new_v4().to_string(),
+            question_uuid: Uuid::new_v4(),
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -318,7 +318,7 @@ mod tests {
     #[tokio::test]
     async fn delete_question_should_return_error() {
         let question_id = QuestionId {
-            question_uuid: Uuid::new_v4().to_string(),
+            question_uuid: Uuid::new_v4(),
         };
 
         let mut questions_dao = QuestionsDaoMock::new();
@@ -340,7 +340,7 @@ mod tests {
     async fn create_answer_should_return_answer() {
         let question_uuid = Uuid::new_v4();
         let answer = Answer {
-            question_uuid: question_uuid.to_string(),
+            question_uuid: question_uuid,
             content: "test content".to_owned(),
         };
 
@@ -366,7 +366,7 @@ mod tests {
     #[tokio::test]
     async fn create_answer_should_return_bad_request_error() {
         let answer = Answer {
-            question_uuid: Uuid::new_v4().to_string(),
+            question_uuid: Uuid::new_v4(),
             content: "test content".to_owned(),
         };
 
@@ -388,7 +388,7 @@ mod tests {
     #[tokio::test]
     async fn create_answer_should_return_internal_error() {
         let answer = Answer {
-            question_uuid: Uuid::new_v4().to_string(),
+            question_uuid: Uuid::new_v4(),
             content: "test content".to_owned(),
         };
 
@@ -414,7 +414,7 @@ mod tests {
     async fn read_answers_should_return_answers() {
         let question_uuid = Uuid::new_v4();
         let question_id = QuestionId {
-            question_uuid: question_uuid.to_string(),
+            question_uuid,
         };
 
         let answer_detail = AnswerDetail {
@@ -439,7 +439,7 @@ mod tests {
     #[tokio::test]
     async fn read_answers_should_return_error() {
         let question_id = QuestionId {
-            question_uuid: Uuid::new_v4().to_string(),
+            question_uuid: Uuid::new_v4(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -460,7 +460,7 @@ mod tests {
     #[tokio::test]
     async fn delete_answer_should_succeed() {
         let answer_id = AnswerId {
-            answer_uuid: Uuid::new_v4().to_string(),
+            answer_uuid: Uuid::new_v4(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();
@@ -478,7 +478,7 @@ mod tests {
     #[tokio::test]
     async fn delete_answer_should_return_error() {
         let answer_id = AnswerId {
-            answer_uuid: Uuid::new_v4().to_string(),
+            answer_uuid: Uuid::new_v4(),
         };
 
         let mut answers_dao = AnswersDaoMock::new();
