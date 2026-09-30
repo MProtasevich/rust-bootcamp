@@ -1,5 +1,8 @@
-use thiserror::Error;
 use serde::{Deserialize, Serialize};
+use sqlx::types::time::PrimitiveDateTime;
+use sqlx::FromRow;
+use sqlx::types::Uuid;
+use thiserror::Error;
 
 #[derive(Serialize, Deserialize)]
 pub struct Question {
@@ -7,38 +10,38 @@ pub struct Question {
     pub description: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, FromRow)]
 pub struct QuestionDetail {
-    pub question_uuid: String,
+    pub question_uuid: Uuid,
     pub title: String,
     pub description: String,
-    pub created_at: String,
+    pub created_at: PrimitiveDateTime,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct QuestionId {
-    pub question_uuid: String,
+    pub question_uuid: Uuid,
 }
 
 // ----------
 
 #[derive(Serialize, Deserialize)]
 pub struct Answer {
-    pub question_uuid: String,
+    pub question_uuid: Uuid,
     pub content: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, FromRow)]
 pub struct AnswerDetail {
-    pub answer_uuid: String,
-    pub question_uuid: String,
+    pub answer_uuid: Uuid,
+    pub question_uuid: Uuid,
     pub content: String,
-    pub created_at: String,
+    pub created_at: PrimitiveDateTime,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct AnswerId {
-    pub answer_uuid: String,
+    pub answer_uuid: Uuid,
 }
 
 // ----------
